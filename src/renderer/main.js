@@ -1,16 +1,57 @@
-import Vue from 'vue'
-import axios from 'axios'
-import Mhr from "./menhera"
+import Vue from "vue";
+import axios from "axios";
+import Mhr from "./menhera";
+import "iview/dist/styles/iview.css";
 
-import App from './App'
-import router from './router'
-import store from './store'
+import {
+  Input,
+  Select,
+  Option,
+  Button,
+  Table,
+  Sider,
+  Menu,
+  Submenu,
+  MenuItem,
+  Layout,
+  Card,
+  Icon,
+  Header,
+  Content,
+  Breadcrumb,
+  BreadcrumbItem
+} from "iview";
+let Components = {
+  Input,
+  Select,
+  Option,
+  Button,
+  Table,
+  Sider,
+  Menu,
+  Submenu,
+  MenuItem,
+  Layout,
+  Card,
+  Icon,
+  Header,
+  Content,
+  Breadcrumb,
+  BreadcrumbItem
+};
+for ([key, val] of Object.entries(Components)) {
+  Vue.component(key, val);
+}
 
-if (!process.env.IS_WEB) Vue.use(require('vue-electron'))
-Vue.http = Vue.prototype.$http = axios
-Vue.config.productionTip = false
+import App from "./App";
+import router from "./router";
+import store from "./store";
 
-Vue.use(Mhr)
+if (!process.env.IS_WEB) Vue.use(require("vue-electron"));
+Vue.http = Vue.prototype.$http = axios;
+Vue.config.productionTip = false;
+
+Vue.use(Mhr);
 
 /* eslint-disable no-new */
 new Vue({
@@ -19,5 +60,5 @@ new Vue({
   },
   router,
   store,
-  template: '<App/>'
-}).$mount('#app')
+  template: "<App/>"
+}).$mount("#app");
