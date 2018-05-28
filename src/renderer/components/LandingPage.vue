@@ -10,15 +10,26 @@
       Card
         div(style="height: 600px")
           Menu(active-name="test" width="auto")
-            MenuItem.menu-item(v-if='val.type !== "object"' v-for="(val, key) in currentMda"  :name="key") 
+            MenuItem.menu-item(v-for="(val, key) in currentMda"  :name="key") 
               div.stringItem(v-if='val.type === "enum"')
-                span {{key}}: {{val.val}}                                 
-                //- Select(:disabled="false")
-                //-   Option(v-for='e in val.enums' :value="e") 
-              div.stringItem(v-if='val.type === "string"')
+                span {{key}}                                 
+                Select(v-model="val.val" :disabled="false")
+                  Option(v-for='e in val.enums' :value="e" @on-change="runFunc(key)") 
+              div.boolItem(v-if='val.type === "boolean"')
+                span {{key}}:                                                 
+                i-switch(v-model="val.val" @on-change="runFunc(key)")
+              div.stringItem(v-if='val.type === "string" || val.type === "number"')
                 span {{key}}:                                 
-                Input(v-model="val.val" @on-change="runFun(key)")  
-              Button(v-if='val.type == "function"' @click="runFun(key)") {{key}}
+                Input(v-model="val.val" @on-enter="runFunc(key)")  
+              Button(v-if='val.type == "function"' @click="runFunc(key)") {{key}}
+              div.objctItem(v-if='val.type === "object" ')
+                Collapse
+                  Panel {{key}}
+              div.arrayItem(v-if='val.type === "array" ')
+                Collapse
+                  Panel {{key}}
+
+
           
 </template>
 
@@ -48,7 +59,7 @@ export default {
         MDA: {
           run: {
             $({ _key, _val }) {
-              console.log(_key, _val);
+              // console.log(_key, _val);
               let val = get(_this.MDA.mounts, _key);
               if (!val) {
                 return console.log(`${_key} is not valid`);
@@ -92,10 +103,10 @@ export default {
     onSelect(key) {
       this.currentMount = key;
     },
-    runFun(key) {
+    runFunc(key) {
       this.mhr.$use({
         "MDA.run": {
-          [`${this.currentMount}.${key}`]: this.currentMda[key].val || null
+          [`${this.currentMount}.${key}`]: this.currentMda[key].val || false
         }
       });
     }

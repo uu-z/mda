@@ -6,32 +6,16 @@ import { observable, observe } from "@nx-js/observer-util";
 const port = 2333;
 const server = http.createServer();
 let io = IO(server);
+const matchEnum = /|/;
 
-const test = {
-  port: {
-    type: "string",
-    val: 6666
-  },
-  server: {
-    type: "object",
-    val: null
-  },
-  status: {
-    type: "enum",
-    disabled: true,
-    sync: true,
-    enums: {
-      running: "running",
-      stop: "stop"
-    },
-    val: "stop"
-  },
-  listen: {
-    type: "function",
-    val() {
-      this.status.val = "running";
-      console.log(this);
-    }
+const testRaw = {
+  number: 6666,
+  boolean: true,
+  array: [1, 2, 3],
+  object: { 1: 1, 2: 2, 3: 3 },
+  enum: `>stop|pending|running`,
+  function() {
+    this.enum.val = "running";
   }
 };
 
@@ -40,6 +24,54 @@ const MDA = {
   mounts: {},
   _hooks: {
     MDA: {
+      mountRaw: {
+        $({ _key, _val, _, cp }) {
+          $(_val, (k, _v) => {
+            let v = {
+              type: typeof _v,
+              val: _v
+            };
+            if (v.type == "string") {
+              v._val = "";
+              v.enums = [];
+              if (/|/.test(v)) {
+                v.val.split("|").forEach(i => {
+                  if (i.startsWith(">")) {
+                    i = i.replace(">", "");
+                    v._val = i;
+                  }
+                  v.enums.push(i);
+                });
+                v.type = "enum";
+                v.val = v._val;
+                delete v._val;
+              }
+            }
+
+            if (v.type == "function") {
+              v.val = v.val.bind(_val);
+            }
+
+            if (v.type == "object") {
+              if (Array.isArray(v.val)) {
+                v.type = "array";
+              }
+            }
+
+            _val[k] = v;
+            _val[k] = observable(v);
+            observe(() => {
+              io.emit("$use", {
+                "MDA.run": {
+                  [`${_key}.${k}`]: _val[k].val
+                }
+              });
+            });
+          });
+          this.mounts[_key] = _val;
+          _val._ = _;
+        }
+      },
       mount: {
         $({ _key, _val, _, cp }) {
           this.mounts[_key] = _val;
@@ -48,16 +80,14 @@ const MDA = {
             if (v.type == "function") {
               v.val = v.val.bind(_val);
             }
-            if (v.sync) {
-              _val[k] = observable(v);
-              observe(() => {
-                io.emit("$use", {
-                  "MDA.run": {
-                    [`${_key}.${k}`]: _val[k].val
-                  }
-                });
+            _val[k] = observable(v);
+            observe(() => {
+              io.emit("$use", {
+                "MDA.run": {
+                  [`${_key}.${k}`]: _val[k].val
+                }
               });
-            }
+            });
           });
         }
       },
@@ -82,20 +112,23 @@ const MDA = {
 Mhr.$use({
   _mount: { MDA },
   MDA: {
+    mountRaw: {
+      testRaw
+    },
     mount: {
-      test,
-      test1: test
+      // test,
+      // test1: test
     }
   }
 });
 
-for (let [key, val] of Object.entries(Mhr)) {
-  if (typeof val == "function") {
-    Mhr._events.on(key, o => {
-      io.emit(key, o);
-    });
-  }
-}
+// for (let [key, val] of Object.entries(Mhr)) {
+//   if (typeof val == "function") {
+//     Mhr._events.on(key, o => {
+//       io.emit(key, o);
+//     });
+//   }
+// }
 
 io.on("connection", socket => {
   socket.emit("$init", Mhr.MDA);
