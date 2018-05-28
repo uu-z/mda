@@ -1,80 +1,107 @@
-import Mhr, { $get, $set } from "menhera";
+import Mhr, { $, get, set, $get, $set } from "menhera";
 import IO from "socket.io";
 import http from "http";
+import { observable, observe } from "@nx-js/observer-util";
 
 const port = 2333;
 const server = http.createServer();
 let io = IO(server);
 
 const test = {
-  name: "test",
-  data: {
-    port: {
-      type: "string",
-      val: 6666
+  port: {
+    type: "string",
+    val: 6666
+  },
+  server: {
+    type: "object",
+    val: null
+  },
+  status: {
+    type: "enum",
+    disabled: true,
+    sync: true,
+    enums: {
+      running: "running",
+      stop: "stop"
     },
-    server: {
-      type: "object",
-      val: null
-    },
-    status: {
-      type: "enum",
-      disabled: true,
-      enums: {
-        running: "running",
-        stop: "stop"
+    val: "stop"
+  },
+  listen: {
+    type: "function",
+    val() {
+      this.status.val = "running";
+      console.log(this);
+    }
+  }
+};
+
+const MDA = {
+  name: "MDA",
+  mounts: {},
+  _hooks: {
+    MDA: {
+      mount: {
+        $({ _key, _val, _, cp }) {
+          this.mounts[_key] = _val;
+          _val._ = _;
+          $(_val, (k, v) => {
+            if (v.type == "function") {
+              v.val = v.val.bind(_val);
+            }
+            if (v.sync) {
+              _val[k] = observable(v);
+              observe(() => {
+                io.emit("$use", {
+                  "MDA.run": {
+                    [`${_key}.${k}`]: _val[k].val
+                  }
+                });
+              });
+            }
+          });
+        }
       },
-      val: "running"
-    },
-    listen: {
-      type: "function",
-      val() {
-        this.server = http.createServer();
-        this.server.listen(this.port, () => {
-          console.log(`server running on port: ${this.port}`);
-        });
+      run: {
+        $({ _key, _val }) {
+          let val = get(this.mounts, _key);
+          if (!val) {
+            return console.log(`${_key} is not valid`);
+          }
+          if (val.type !== "function") {
+            set(this.mounts, `${_key}.val`, _val);
+          }
+          if (val.type == "function") {
+            val.val();
+          }
+        }
       }
     }
   }
 };
 
 Mhr.$use({
-  _hooks: {
-    data: {
-      _({ cp }) {
-        if (!cp["$data"]) {
-          cp["$data"] = {};
-        }
-      },
-      $({ _key, _val, cp }) {
-        const { val } = _val;
-        if (typeof val === "function") {
-          cp["$data"][_key] = "function";
-          return;
-        }
-        cp["$data"][_key] = val;
-      }
+  _mount: { MDA },
+  MDA: {
+    mount: {
+      test,
+      test1: test
     }
-  },
-  _mount: {
-    test
   }
 });
 
+for (let [key, val] of Object.entries(Mhr)) {
+  if (typeof val == "function") {
+    Mhr._events.on(key, o => {
+      io.emit(key, o);
+    });
+  }
+}
+
 io.on("connection", socket => {
+  socket.emit("$init", Mhr.MDA);
   socket.on("$use", o => {
     console.log(o);
-    if (o.$use) {
-      Mhr.$use(o.$use);
-    }
-    if (o.$get) {
-      o.$get = $get(Mhr, o.$get);
-      socket.emit("$get", o);
-    }
-    if (o.$set) {
-      o.$set = $set(Mhr, o.$set);
-      socket.emit("$set", o);
-    }
+    Mhr.$use(o);
   });
 });
 
