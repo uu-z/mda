@@ -122,14 +122,6 @@ Mhr.$use({
   }
 });
 
-// for (let [key, val] of Object.entries(Mhr)) {
-//   if (typeof val == "function") {
-//     Mhr._events.on(key, o => {
-//       io.emit(key, o);
-//     });
-//   }
-// }
-
 io.on("connection", socket => {
   socket.emit("$init", Mhr.MDA);
   socket.on("$use", o => {
